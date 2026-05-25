@@ -1,0 +1,119 @@
+#!/bin/bash
+clear ## CLEAR SCREEN FOR FRESH OUTPUT
+if [ -z "$1" ]; then arg="noarg"; else arg=$1; fi
+if [ $arg = "-h" ]; then
+  echo -e "-----------------------------------------"
+  echo -e "This script will reclaim storage space"
+  echo -e "used by system logs, temporary and cached"
+  echo -e "files, and by pruning the docker system.\n"
+  echo -e "Usage: ./$(basename "$0") [OPTION]\n"
+  echo -e "Options:"
+  echo -e "  -h      Display this help message."
+  echo -e "  -dsp    Include the docker system"
+  echo -e "          pruning process.\n"
+  echo -e "Note: any other option will bypass"
+  echo -e "      the Docker pruning process."
+  echo -e "-----------------------------------------\n"
+  exit 0
+fi
+## NUMBER OF DAYS TO VACCUMM SYSTEM JOURNAL
+JournalDays="2days"
+## NUMBER OF ARCHIVE FILE ITERATIONS TO REMOVE
+ArchiveFiles=5
+## PATH CONTAINING SYSTEM LOGS
+SysLogPath="/var/log"
+## SYSTEM LOG FILES TO BE TRUNCATED (ARRAY)
+SysLogFiles=(
+  "syslog"
+  "faillog"
+  "daemon.log"
+  "kern.log"
+  "messages"
+  "auth.log"
+  "debug"
+  "user.log"
+  "lastlog"
+  "wtmp"
+  "btmp"
+  "dpkg.log"
+  "alternatives.log"
+  "php7.4-fpm.log"
+  "php8.4-fpm.log"
+  "cron.log"
+)
+echo "Starting space reclaim script..."
+echo "  ($(date +"%Y-%m-%d %H:%M:%S"))"
+if [ $arg = "-dsp" ]; then
+  echo "  (docker system prune enabled with option: $arg)"
+else
+  echo "  (docker system prune disabled)"
+  echo "  (run ./$(basename "$0") -h for help)"
+fi
+echo -e "\nCleaning Advanced Package Tool...\n"
+apt-get clean
+apt-get autoclean
+apt-get autoremove
+echo -e "\nAdvanced Package Tool cleaned.\n"
+echo -e "Removing temporary and cached files..."
+rm -rf /tmp/*
+rm -rf ~/.cache/*
+echo -e "\nTemporary and cached files removed.\n"
+echo -e "Truncating system logs...\n"
+for log in "${SysLogFiles[@]}"; do
+  truncate -s 0 $SysLogPath/$log
+  echo "Truncated $log"
+done
+echo -e "\nSystem logs truncated."
+echo -e "\nStopping System log service and socket..."
+systemctl stop rsyslog.service syslog.socket
+echo -e "\nSystem log service and socket stopped.\n"
+echo -e "Removing archived system logs...\n"
+for ((i=1; i<=$ArchiveFiles; i++)); do
+  echo -e "Removing archove $i files..."
+  if ls -l $SysLogPath/*.$i 2> /dev/null; then
+    rm $SysLogPath/*.$i; echo -e "\nArchive $i files removed.\n"
+  else
+    echo -e "  (no archive $i files to remove)\n"
+  fi
+done
+echo -e "Removing compressed files..."
+if ls -l $SysLogPath/*.gz 2> /dev/null; then
+    rm $SysLogPath/*.gz; echo -e "\nCompressed files removed."
+else
+    echo "  (no compressed files to remove)"
+fi
+echo -e "\nArchived system logs removed.\n"
+echo -e "Starting system log service and socket...\n"
+systemctl start rsyslog.service syslog.socket
+systemctl status syslog.socket
+echo -e "\nSystem log service and socket started.\n"
+echo -e "Log directories remaining in $SysLogPath:"
+du -h --max-depth=1 $SysLogPath | sort -hr
+echo -e "\nLog files remaining in $SysLogPath:"
+ls -lShA $SysLogPath | grep '^-'
+echo -e "\nBefore vaccumming,"
+journalctl --disk-usage
+echo -e "\nVaccuuming system journal...\n"
+journalctl --vacuum-time=$JournalDays
+echo -e "\nSystem journal vaccummed."
+echo -e "\nAfter vaccumming,"
+journalctl --disk-usage
+if [ $arg != "-dsp" ]; then 
+  echo -e "\nSpace reclaim script completed.\n  ($(date +"%Y-%m-%d %H:%M:%S"))\n"
+  exit 0
+fi
+while true; do
+  read -p "`echo -e '\nThe next step is Docker system pruning. Ensure all the\nDocker apps you want to retain are running or they will\nbe removed. Docker will ask for additional confirmation.\n\nDo you want to prune the docker system? (y/n) '`" response
+  case $response in
+    [Yy]* ) break;;
+    [Nn]* ) echo -e "\nDocker system pruning skipped.\n\nSpace reclaim script completed.\n  ($(date +"%Y-%m-%d %H:%M:%S"))\n"; exit;;
+    * ) echo -e "\nInvalid response. Please answer y or n.";;
+  esac
+done
+echo -e "\nPruning docker container system...\n"
+#docker system prune -a
+docker system prune -a --volumes
+echo -e "\nPruning docker container image...\n"
+docker image prune -a
+echo -e "\nDocker system pruning completed."
+echo -e "\nSpace reclaim script completed.\n  ($(date +"%Y-%m-%d %H:%M:%S"))\n"
