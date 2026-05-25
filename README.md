@@ -1,12 +1,12 @@
 This script will reclaim storage space used by system logs,<BR>
 temporary and cached files, and by pruning the docker system. 
 
-Usage:<BR> ./run-reclaim [OPTION]
+Usage:<BR>./run-reclaim [OPTION]<BR>
 
-  Options:
-  -h      Display this help message.
-  -dsp    Include the docker system pruning process.
+  Options:<BR>
+  -h      Display this help message.<BR>
+  -dsp    Include the docker system pruning process.<BR><BR>
 
-  Note: any other option will  clear system logs, temporary
+  Note: any other option will  clear system logs, temporary<BR>
         and cached files, but skip pruning the docker system.
         
