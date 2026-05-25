@@ -1,7 +1,7 @@
-This script will reclaim storage space used by system logs,
+This script will reclaim storage space used by system logs,<BR>
 temporary and cached files, and by pruning the docker system. 
 
-Usage: ./run-reclaim [OPTION]<BR>
+Usage:<BR> ./run-reclaim [OPTION]
 
   Options:
   -h      Display this help message.
